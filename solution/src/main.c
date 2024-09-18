@@ -1,6 +1,7 @@
-#include "file_helper.h"
+
+#include "elf_reader.h"
 int main(int argc, char **argv) {
-  int ds = read_file(argv[1], O_RDONLY);
-  printf("%d", ds);
+  int fd = open_file(argv[1], O_RDONLY);
+  Elf64_Ehdr file_header=read_file_header(fd);
   return 0;
 }
