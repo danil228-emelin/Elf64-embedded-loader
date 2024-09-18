@@ -18,8 +18,9 @@ void check_elf64_header(Elf64_Ehdr header) {
     exit_and_write(
         9, "Wrong elf architecture.Work only with the 64-bit architecture.\n");
   }
-  if (header.e_type != ET_EXEC) {
-    exit_and_write(9, "Wrong elf file.Work only with executable files.\n");
+  // ET_DYN or ET_EXEC
+  if (header.e_type != ET_DYN) {
+    exit_and_write(9, "Wrong elf file type.Work only with executable files.\n");
   }
   if (header.e_ident[EI_VERSION] != EV_CURRENT) {
     exit_and_write(9, "Wrong elf file.Problem with version.\n");
@@ -62,4 +63,32 @@ void read_elf64_section_header_table(int fd, Elf64_Ehdr *file_header,
     table_segments[i] =
         read_elf64_segment_table_entry(fd, file_header->e_shentsize);
   }
+}
+
+// maybe another way of checking
+//  another error code
+// will we have name size in bytes???.
+Elf64_Shdr find_executable_section(const char *section_executable_name,
+                                   const Elf64_Ehdr *file_header,
+                                   const Elf64_Shdr *segment_table, int fd) {
+  if (file_header->e_shstrndx == SHN_UNDEF) {
+    exit_and_write(-1, "Can't find executable section because section name "
+                       "string table doesn't exist.\n");
+  }
+  Elf64_Shdr section_name_string_table = segment_table[file_header->e_shstrndx];
+  if (section_name_string_table.sh_type != SHT_STRTAB) {
+    exit_and_write(-1, "Can't read sections' names,current section isn't name "
+                       "string table.\n");
+  }
+
+  for (int i = 0; i < file_header->e_shnum; i++) {
+    set_position(fd, section_name_string_table.sh_offset +
+                         segment_table[i].sh_name);
+    char section_name[32];
+    read_bytes_from_file(fd, section_name, 32);
+    if (compare_string(section_executable_name, section_name)) {
+      return segment_table[i];
+    }
+  }
+  exit_and_write(-1, "Can't find executable section\n");
 }

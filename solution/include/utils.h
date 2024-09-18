@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdnoreturn.h>
 #include <unistd.h>
-int string_len(const char *error_message);
+size_t string_len(const char *str);
 void exit_and_write(int exit_status, const char *error_message);
+int compare_string(const char *str1, const char *str2);
 #endif

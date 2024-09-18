@@ -10,5 +10,7 @@ int main(int argc, char **argv) {
   read_program_header_table(fd, &file_header, header_table);
   Elf64_Shdr segment_table[file_header.e_shnum];
   read_elf64_section_header_table(fd, &file_header, segment_table);
+  Elf64_Shdr executable_segment =
+      find_executable_section(argv[2], &file_header, segment_table, fd);
   return 0;
 }
