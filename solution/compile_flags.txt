@@ -1,4 +1,1 @@
--Iinclude/
--pedantic
--Wall
--Werror
+- Iinclude / -pedantic - Wall - Werror
