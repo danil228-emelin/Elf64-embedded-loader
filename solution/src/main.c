@@ -1,7 +1,6 @@
-#include <stdio.h>
-
-int main( int argc, char** argv ) {
-    (void) argc; (void) argv; // supress 'unused parameters' warning
-
-    return 0;
+#include "file_helper.h"
+int main(int argc, char **argv) {
+  int ds = read_file(argv[1], O_RDONLY);
+  printf("%d", ds);
+  return 0;
 }
