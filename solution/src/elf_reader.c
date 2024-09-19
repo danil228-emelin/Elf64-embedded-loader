@@ -26,8 +26,8 @@ void check_elf64_header(Elf64_Ehdr header) {
     exit_and_write(9, "Wrong elf file.Problem with version.\n");
   }
 }
-// Possible Elf64_Half -> size_t
 
+// Possible Elf64_Half -> size_t
 void set_position(int fd, Elf64_Off offset) {
   off_t file_position = 0;
   if ((file_position = lseek(fd, offset, SEEK_SET)) == -1) {
@@ -56,6 +56,7 @@ Elf64_Shdr read_elf64_segment_table_entry(int fd, Elf64_Half entry_size) {
   read_bytes_from_file(fd, &segment, entry_size);
   return segment;
 }
+
 void read_elf64_section_header_table(int fd, Elf64_Ehdr *file_header,
                                      Elf64_Shdr *table_segments) {
   set_position(fd, file_header->e_shoff);
@@ -91,4 +92,74 @@ Elf64_Shdr find_executable_section(const char *section_executable_name,
     }
   }
   exit_and_write(-1, "Can't find executable section\n");
+}
+
+uintptr_t align_virtual_address(Elf64_Word virtual_address) {
+  return (uintptr_t)virtual_address & (uintptr_t) ~(sysconf(_SC_PAGE_SIZE) - 1);
+}
+void *allocate_memory(void *virtual_address, size_t size) {
+  void *result = mmap(virtual_address, size, PROT_READ | PROT_WRITE,
+                      MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  if (result == MAP_FAILED) {
+    exit_and_write(errno, "Can't' allocate memory.");
+  }
+  return result;
+}
+
+void set_permission_for_pages(const Elf64_Phdr *header_table,
+                              size_t amount_of_entries) {
+  for (size_t i = 0; i < amount_of_entries; i++) {
+    if (header_table[i].p_type == PT_LOAD) {
+      int permissions = 0;
+        void * aligned_virtual_address =
+          (void *)align_virtual_address(header_table[i].p_vaddr);
+      if (header_table[i].p_flags & PF_X) {
+        permissions |= PROT_EXEC;
+      }
+      if (header_table[i].p_flags & PF_W) {
+        permissions |= PROT_WRITE;
+      }
+      if (header_table[i].p_flags & PF_R) {
+        permissions |= PROT_READ;
+      }
+      int result = mprotect(aligned_virtual_address, header_table[i].p_memsz,
+                            permissions);
+      if (result == -1) {
+        exit_and_write(errno, "Cant' set permissions for allocated pages.");
+      }
+    }
+  }
+}
+
+void mmap_file_to_virtual_address_space(int fd, const Elf64_Phdr *header_table,
+                                        size_t amount_of_entries) {
+  for (size_t i = 0; i < amount_of_entries; i++) {
+    if (header_table[i].p_type == PT_LOAD) {
+      set_position(fd, header_table[i].p_offset);
+      void *aligned_virtual_address =
+          (void *)align_virtual_address(header_table[i].p_vaddr);
+      read_bytes_from_file(fd, aligned_virtual_address,
+                           header_table[i].p_filesz);
+    }
+  }
+}
+
+// Maybe wrong implementation.
+// Custom segments can overlap due to page aligning.
+void create_segments(const Elf64_Phdr *header_table, size_t amount_of_entries,
+                     int fd) {
+  for (size_t i = 0; i < amount_of_entries; i++) {
+    if (header_table[i].p_type == PT_LOAD) {
+      void *aligned_virtual_address =
+          (void *)align_virtual_address(header_table[i].p_vaddr);
+      void *address_segment =
+          allocate_memory(aligned_virtual_address, header_table[i].p_memsz);
+      if ((address_segment) != (aligned_virtual_address)) {
+        exit_and_write(-1, "Start segment virtual address isn't the same as "
+                           "aligned virtual address");
+      }
+    }
+  }
+  mmap_file_to_virtual_address_space(fd, header_table, amount_of_entries);
+  set_permission_for_pages(header_table, amount_of_entries);
 }

@@ -1,9 +1,6 @@
 #ifndef ELF64_LOADER_FILE_HELPER_H
 #define ELF64_LOADER_FILE_HELPER_H
 #include "errno.h"
-// NFASFSSALFSALFKSALF
-#include "stdio.h"
-// FAFKLASFJASLDKLAS
 #include "utils.h"
 #include <fcntl.h>
 int open_file(const char *file_name, int flags);

@@ -12,5 +12,6 @@ int main(int argc, char **argv) {
   read_elf64_section_header_table(fd, &file_header, segment_table);
   Elf64_Shdr executable_segment =
       find_executable_section(argv[2], &file_header, segment_table, fd);
+  create_segments(header_table, file_header.e_phnum, fd);
   return 0;
 }
