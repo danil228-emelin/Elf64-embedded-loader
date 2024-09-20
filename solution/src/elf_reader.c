@@ -1,5 +1,4 @@
 #include "elf_reader.h"
-
 Elf64_Ehdr read_elf64_header(int fd) {
   Elf64_Ehdr file_header;
   read_bytes_from_file(fd, &file_header, sizeof(file_header));
@@ -69,9 +68,9 @@ void read_elf64_section_header_table(int fd, Elf64_Ehdr *file_header,
 // maybe another way of checking
 //  another error code
 // will we have name size in bytes???.
-Elf64_Shdr find_executable_section(const char *section_executable_name,
-                                   const Elf64_Ehdr *file_header,
-                                   const Elf64_Shdr *segment_table, int fd) {
+void *find_executable_section(const char *section_executable_name,
+                              const Elf64_Ehdr *file_header,
+                              const Elf64_Shdr *segment_table, int fd) {
   if (file_header->e_shstrndx == SHN_UNDEF) {
     exit_and_write(-1, "Can't find executable section because section name "
                        "string table doesn't exist.\n");
@@ -88,7 +87,7 @@ Elf64_Shdr find_executable_section(const char *section_executable_name,
     char section_name[32];
     read_bytes_from_file(fd, section_name, 32);
     if (compare_string(section_executable_name, section_name)) {
-      return segment_table[i];
+      return (void *)segment_table[i].sh_addr;
     }
   }
   exit_and_write(-1, "Can't find executable section\n");
@@ -101,7 +100,7 @@ void *allocate_memory(void *virtual_address, size_t size) {
   void *result = mmap(virtual_address, size, PROT_READ | PROT_WRITE,
                       MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (result == MAP_FAILED) {
-    exit_and_write(errno, "Can't' allocate memory.");
+    exit_and_write(errno, "Can't allocate memory for segment\n");
   }
   return result;
 }
@@ -111,7 +110,7 @@ void set_permission_for_pages(const Elf64_Phdr *header_table,
   for (size_t i = 0; i < amount_of_entries; i++) {
     if (header_table[i].p_type == PT_LOAD) {
       int permissions = 0;
-        void * aligned_virtual_address =
+      void *aligned_virtual_address =
           (void *)align_virtual_address(header_table[i].p_vaddr);
       if (header_table[i].p_flags & PF_X) {
         permissions |= PROT_EXEC;
@@ -125,7 +124,7 @@ void set_permission_for_pages(const Elf64_Phdr *header_table,
       int result = mprotect(aligned_virtual_address, header_table[i].p_memsz,
                             permissions);
       if (result == -1) {
-        exit_and_write(errno, "Cant' set permissions for allocated pages.");
+        exit_and_write(errno, "Cant' set permissions for allocated pages\n");
       }
     }
   }
@@ -152,8 +151,10 @@ void create_segments(const Elf64_Phdr *header_table, size_t amount_of_entries,
     if (header_table[i].p_type == PT_LOAD) {
       void *aligned_virtual_address =
           (void *)align_virtual_address(header_table[i].p_vaddr);
-      void *address_segment =
-          allocate_memory(aligned_virtual_address, header_table[i].p_memsz);
+      uintptr_t padding = (uintptr_t)header_table[i].p_vaddr -
+                          (uintptr_t)aligned_virtual_address;
+      void *address_segment = allocate_memory(
+          aligned_virtual_address, header_table[i].p_memsz + padding);
       if ((address_segment) != (aligned_virtual_address)) {
         exit_and_write(-1, "Start segment virtual address isn't the same as "
                            "aligned virtual address");
@@ -162,4 +163,32 @@ void create_segments(const Elf64_Phdr *header_table, size_t amount_of_entries,
   }
   mmap_file_to_virtual_address_space(fd, header_table, amount_of_entries);
   set_permission_for_pages(header_table, amount_of_entries);
+}
+
+void check_executable_segment(void *entry_point,
+                              const Elf64_Shdr *segment_table,
+                              Elf64_Phdr *table_headers, size_t table_h,
+                              size_t table_s) {
+  uintptr_t start_address = (uintptr_t)entry_point;
+
+  for (size_t i = 0; i < table_h; i++) {
+    uintptr_t start = table_headers[i].p_vaddr;
+    uintptr_t end = start + table_headers[i].p_memsz;
+
+    if (start_address <= start & start_address < end) {
+      if (!(table_headers[i].p_flags & PF_X) ||
+          !(table_headers[i].p_flags & PF_R)) {
+        exit_and_write(13, "Segment doesn't have permissions for executing or "
+                           "reading,please try another segment\n");
+      }
+    }
+  }
+  for (size_t i = 0; i < table_s; i++) {
+    if (segment_table[i].sh_addr == start_address) {
+      if (!(segment_table[i].sh_flags & (SHF_EXECINSTR))) {
+        exit_and_write(13, "Segment doesn't contain executable "
+                           "instructions,please try another segment\n");
+      }
+    }
+  }
 }

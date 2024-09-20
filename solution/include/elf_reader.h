@@ -21,9 +21,12 @@ void read_program_header_table(int fd, Elf64_Ehdr *file_header,
 Elf64_Shdr read_elf64_segment_table_entry(int fd, Elf64_Half entry_size);
 void read_elf64_section_header_table(int fd, Elf64_Ehdr *file_header,
                                      Elf64_Shdr *table_segments);
-Elf64_Shdr find_executable_section(const char *section_executable_name,
-                                   const Elf64_Ehdr *file_header,
-                                   const Elf64_Shdr *segment_table, int fd);
-void create_segments(const Elf64_Phdr *header_table, size_t amount_of_entries,
-                     int fd);
+void *find_executable_section(const char *section_executable_name,
+                              const Elf64_Ehdr *file_header,
+                              const Elf64_Shdr *segment_table, int fd);
+void create_segments(const Elf64_Phdr *header_table, size_t amount_of_entries,int fd);
+void check_executable_segment(void *entry_point,
+                              const Elf64_Shdr *segment_table,
+                              Elf64_Phdr *table_headers, size_t table_h,
+                              size_t table_s);
 #endif
