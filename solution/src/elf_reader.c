@@ -121,7 +121,9 @@ void set_permission_for_pages(const Elf64_Phdr *header_table,
       if (header_table[i].p_flags & PF_R) {
         permissions |= PROT_READ;
       }
-      int result = mprotect(aligned_virtual_address, header_table[i].p_memsz,
+        uintptr_t padding = (uintptr_t)header_table[i].p_vaddr -
+                            (uintptr_t)aligned_virtual_address;
+      int result = mprotect(aligned_virtual_address, header_table[i].p_memsz+padding,
                             permissions);
       if (result == -1) {
         exit_and_write(errno, "Cant' set permissions for allocated pages\n");
@@ -153,7 +155,7 @@ void create_segments(const Elf64_Phdr *header_table, size_t amount_of_entries,
           (void *)align_virtual_address(header_table[i].p_vaddr);
       uintptr_t padding = (uintptr_t)header_table[i].p_vaddr -
                           (uintptr_t)aligned_virtual_address;
-      void *address_segment = allocate_memory(
+          void *address_segment = allocate_memory(
           aligned_virtual_address, header_table[i].p_memsz + padding);
       if ((address_segment) != (aligned_virtual_address)) {
         exit_and_write(-1, "Start segment virtual address isn't the same as "
