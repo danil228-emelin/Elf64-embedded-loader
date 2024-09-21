@@ -5,7 +5,7 @@ Elf64_Ehdr read_elf64_header(int fd) {
   check_elf64_header(file_header);
   return file_header;
 }
-
+//e_type I don't know.readelf show that I have DYN.
 void check_elf64_header(Elf64_Ehdr header) {
   if (header.e_ident[EI_MAG0] != ELFMAG0 ||
       header.e_ident[EI_MAG1] != ELFMAG1 ||
@@ -13,7 +13,7 @@ void check_elf64_header(Elf64_Ehdr header) {
       header.e_ident[EI_MAG3] != ELFMAG3) {
     exit_and_write(9, "Wrong file header.It's not elf.\n");
   }
-  if (header.e_ident[EI_CLASS] != ELFCLASS64) {
+  if (header.e_ident[EI_CLASS] != ET_EXEC) {
     exit_and_write(
         9, "Wrong elf architecture.Work only with the 64-bit architecture.\n");
   }
